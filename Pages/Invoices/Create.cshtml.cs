@@ -1,24 +1,27 @@
 using System;
 using System.Threading.Tasks;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-
 using InvoiceManager.Authorization;
 using InvoiceManager.Data;
 using InvoiceManager.Models;
+using InvoiceManager.Repositories;
 
 namespace InvoiceManager.Pages.Invoices
 {
     public class CreateModel : DiBasePageModel
     {
-        private readonly UserManager<ApplicationUser> userManager;
+        private readonly IInvoiceRepository _invoiceRepository;
 
-        public CreateModel(ApplicationDbContext context, IAuthorizationService authorizationService, UserManager<ApplicationUser> userManager)
+        public CreateModel(
+            ApplicationDbContext context,
+            IAuthorizationService authorizationService,
+            UserManager<ApplicationUser> userManager,
+            IInvoiceRepository invoiceRepository)
             : base(context, authorizationService, userManager)
         {
-            this.userManager = userManager;
+            _invoiceRepository = invoiceRepository;
         }
 
         public IActionResult OnGet()
@@ -41,10 +44,10 @@ namespace InvoiceManager.Pages.Invoices
                 return Page();
             }
 
-            var user = await userManager.GetUserAsync(User);
+            var user = await UserManager.GetUserAsync(User);
             if (user == null)
             {
-                throw new ApplicationException(string.Format(Resources.ApplicationTexts.UnableToLoadUserWithId, userManager.GetUserId(User)));
+                throw new ApplicationException(string.Format(Resources.ApplicationTexts.UnableToLoadUserWithId, UserManager.GetUserId(User)));
             }
 
             Invoice.OwnerId = UserManager.GetUserId(User);
@@ -58,8 +61,8 @@ namespace InvoiceManager.Pages.Invoices
                 return new ChallengeResult();
             }
 
-            Context.Invoice.Add(Invoice);
-            await Context.SaveChangesAsync();
+            await _invoiceRepository.CreateAsync(Invoice);
+            await _invoiceRepository.SaveAsync();
 
             return RedirectToPage("./Index");
         }

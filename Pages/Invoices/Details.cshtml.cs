@@ -1,28 +1,33 @@
 using System.Threading.Tasks;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-
 using InvoiceManager.Authorization;
 using InvoiceManager.Data;
 using InvoiceManager.Models;
+using InvoiceManager.Repositories;
 
 namespace InvoiceManager.Pages.Invoices
 {
     public class DetailsModel : DiBasePageModel
     {
-        public DetailsModel(ApplicationDbContext context, IAuthorizationService authorizationService, UserManager<ApplicationUser> userManager) 
+        private readonly IInvoiceRepository _invoiceRepository;
+
+        public DetailsModel(
+            ApplicationDbContext context,
+            IAuthorizationService authorizationService,
+            UserManager<ApplicationUser> userManager,
+            IInvoiceRepository invoiceRepository)
             : base(context, authorizationService, userManager)
         {
+            _invoiceRepository = invoiceRepository;
         }
 
         public Invoice Invoice { get; set; }
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            Invoice = await Context.Invoice.FirstOrDefaultAsync(i => i.InvoiceId == id);
+            Invoice = await _invoiceRepository.GetInvoiceByIdAsync(id);
 
             if (Invoice == null)
             {
@@ -34,12 +39,13 @@ namespace InvoiceManager.Pages.Invoices
                 Invoice.AccountantId = Resources.ApplicationTexts.NoAccountantIdAdded;
             }
 
-            if (string.IsNullOrEmpty(Invoice.AccountantId))
+            if (string.IsNullOrEmpty(Invoice.CompanyName))
             {
-                Invoice.AccountantId = Resources.ApplicationTexts.NoCompanyNameAdded;
+                Invoice.CompanyName = Resources.ApplicationTexts.NoCompanyNameAdded;
             }
 
-            var isAuthorized = User.IsInRole(Resources.ApplicationTexts.InvoiceAccountantRole) || User.IsInRole(Resources.ApplicationTexts.InvoiceAdministratorsRole);
+            var isAuthorized = User.IsInRole(Resources.ApplicationTexts.InvoiceAccountantRole) ||
+                               User.IsInRole(Resources.ApplicationTexts.InvoiceAdministratorsRole);
 
             var currentUserId = UserManager.GetUserId(User);
 
@@ -53,14 +59,16 @@ namespace InvoiceManager.Pages.Invoices
 
         public async Task<IActionResult> OnPostAsync(int id, InvoiceStatus status)
         {
-            var invoice = await Context.Invoice.FirstOrDefaultAsync(i => i.InvoiceId == id);
+            var invoice = await _invoiceRepository.GetInvoiceByIdAsync(id);
 
             if (invoice == null)
             {
                 return NotFound();
             }
 
-            var invoiceOperation = (status == InvoiceStatus.Approved) ? InvoiceOperations.Approve : InvoiceOperations.Reject;
+            var invoiceOperation = (status == InvoiceStatus.Approved)
+                ? InvoiceOperations.Approve
+                : InvoiceOperations.Reject;
 
             var isAuthorized = await AuthorizationService.AuthorizeAsync(User, invoice, invoiceOperation);
 
@@ -70,8 +78,8 @@ namespace InvoiceManager.Pages.Invoices
             }
 
             invoice.Status = status;
-            Context.Invoice.Update(invoice);
-            await Context.SaveChangesAsync();
+            await _invoiceRepository.UpdateAsync(invoice);
+            await _invoiceRepository.SaveAsync();
 
             return RedirectToPage("./Index");
         }
