@@ -1,85 +1,78 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-
-using InvoiceManager.Authorization;
+using Microsoft.Extensions.Hosting;
 using InvoiceManager.Data;
+using InvoiceManager.Authorization;
 using InvoiceManager.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace InvoiceManager
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration, IHostingEnvironment environment)
+        public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
-            Environment = environment;
         }
 
         public IConfiguration Configuration { get; }
-        private IHostingEnvironment Environment { get; }
-
 
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
 
-            services.AddIdentity<ApplicationUser, IdentityRole>()
-                .AddEntityFrameworkStores<ApplicationDbContext>()
-                .AddDefaultTokenProviders();
+            services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = false)
+                .AddRoles<IdentityRole>()
+                .AddEntityFrameworkStores<ApplicationDbContext>();
 
-            var skipHttps = Configuration.GetValue<bool>("LocalTest:skipHTTPS");
-
-            services.Configure<MvcOptions>(options =>
+            services.AddRazorPages(options =>
             {
-                if (Environment.IsDevelopment() && !skipHttps)
-                {
-                    options.Filters.Add(new RequireHttpsAttribute());
-                }
+                options.Conventions.AuthorizeFolder("/Invoices");
             });
 
-            services.AddSingleton<IEmailSender, EmailSender>();
-          
-            services.AddMvc(config =>
+            services.AddAuthorization(options =>
             {
-                var policy = new AuthorizationPolicyBuilder()
-                                 .RequireAuthenticatedUser()
-                                 .Build();
-                config.Filters.Add(new AuthorizeFilter(policy));
+                // Add any custom authorization policies here
             });
 
-            services.AddScoped<IAuthorizationHandler,
-                                  InvoiceIsOwnerAuthorizationHandler>();
+            services.AddScoped<IEmailSender, EmailSender>();
 
-            services.AddSingleton<IAuthorizationHandler,
-                                  InvoiceAdministratorsAuthorizationHandler>();
-
-            services.AddSingleton<IAuthorizationHandler,
-                                  InvoiceManagerAuthorizationHandler>();
+            services.AddScoped<IAuthorizationHandler, InvoiceIsOwnerAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, InvoiceAdministratorsAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, InvoiceManagerAuthorizationHandler>();
         }
 
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseBrowserLink();
                 app.UseDatabaseErrorPage();
             }
             else
             {
                 app.UseExceptionHandler("/Error");
+                app.UseHsts();
             }
 
+            app.UseHttpsRedirection();
             app.UseStaticFiles();
+
+            app.UseRouting();
+
             app.UseAuthentication();
-            app.UseMvc();           
+            app.UseAuthorization();
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapRazorPages();
+                endpoints.MapControllers();
+            });
         }
     }
 }
