@@ -9,6 +9,7 @@ using InvoiceManager.Data;
 using InvoiceManager.Authorization;
 using InvoiceManager.Services;
 using Microsoft.AspNetCore.Authorization;
+using InvoiceManager.Repositories;
 
 namespace InvoiceManager
 {
@@ -45,6 +46,8 @@ namespace InvoiceManager
             services.AddScoped<IAuthorizationHandler, InvoiceIsOwnerAuthorizationHandler>();
             services.AddSingleton<IAuthorizationHandler, InvoiceAdministratorsAuthorizationHandler>();
             services.AddSingleton<IAuthorizationHandler, InvoiceManagerAuthorizationHandler>();
+
+            services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
