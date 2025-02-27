@@ -13,7 +13,7 @@ The application is currently built with ASP.NET Core 2.0 and uses Razor Pages fo
 
 ## Refactoring
 
-This project was created some time ago and needs modernization. The primary goals for refactoring are:
+This project was created 7 years ago and needs modernization. The primary goals for refactoring are:
 
 1. Upgrade to newer .NET Core versions
 2. Implement clean architecture patterns
